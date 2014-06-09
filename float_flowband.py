@@ -36,7 +36,8 @@ from dolfin import *
 from matplotlib import pyplot
 from numpy import array, linspace, empty
 import sys
-from scipy.ndimage.filters import gaussian_filter
+import numpy as np
+
 command_line_arguments = sys.argv
 
 
@@ -98,7 +99,7 @@ try:
 except:
   dt = Constant(250)
 
-nSteps = 40
+nSteps = 10
 L = 100e3     # Initial length
 
 # Using the notation in the paper (not the book)
@@ -113,17 +114,13 @@ A_s = 0.01    # "a sliding constant"  (B_s in the book)
 p   = 1.0     # Exponent on effective pressure term (q in the book)
 B_s = 540.0   # Flow law constant (B in the book)
 
-W = Expression("25000/(1 + 200*exp(0.05e-3*(x[0]-200e3))) + 5000", cell=interval) # Half width
-
+# Half width
+W = Expression("25000/(1 + 200*exp(0.05e-3*(x[0]-200e3))) + 5000", cell=interval) 
 bed = "1000/(1 + 200*exp(0.10e-3*(x[0]-250e3))) - 950"
 h_b = Expression(bed, cell=interval)  # Bed elevation
 
-# A useful expression for the effective pressure term:
-x0 = 250.0e3 + 10.0e3*ln(1.0/3800.0) # x-coordinate where h_b = 0
-reduction = Expression('x[0] <= x0? 0.0 : ratio*('+bed+')', x0=x0, ratio=rho_w/rho)
 
 # Parameters specific to the two curves in "Beyond back stress: ..."
-
 if curve == 1:
   M = Constant(0.3)    # Accumulation
   if 'shelf' in command_line_arguments:
@@ -196,8 +193,6 @@ u = project(Expression('x[0]/L', L=1000*L), V) # initial guess of velocity
 h_u_dhdx = project(as_vector((h,u,h.dx(0))), V3)
 h,u,dhdx = split(h_u_dhdx)
 
-#smooth_step = Expression('1 / (1 + exp(-1./W*(xg - x[0])))',W=1e3, xg = L)
-
 class Floating(Expression):
   def eval(self,value,x):
     if h_u_dhdx(x[0])[0] <= -h_b(x[0])*(rho_w/rho-1):
@@ -207,13 +202,12 @@ class Floating(Expression):
 
 t_float = smooth_step_conditional(Floating())
 
+# A useful expression for the effective pressure term:
+x0 = 250.0e3 + 10.0e3*ln(1.0/3800.0) # x-coordinate where h_b = 0
+reduction = Expression('x[0] <= x0? 0.0 : ratio*('+bed+')', x0=x0, ratio=rho_w/rho)
+#reduction =  t_float * (rho_w/rho)*h_b
 
 if 'floating' in command_line_arguments:
-  #xg = find_gl(project(h-h_b,V),h_b)
-  #smooth_step.user_parameters['xg'] = xg
-  #H = project((1.-smooth_step) * (h - h_b) + smooth_step * h / (1 - rho/rho_w),V)
-  #floating = le(h,-h_b*(rho_w/rho-1))
-  #H = conditional(floating, h/(1-rho/rho_w), h-h_b) # H is the ice thickness
   H = t_float * (h/(1-rho/rho_w)) + (1-t_float) * (h-h_b) # H is the ice thickness
   
 else:
@@ -230,7 +224,6 @@ basal_drag     = mu*A_s*(H+reduction)**p*u**(1/n)
 lateral_drag   = (B_s*H/W)*((n+2)*u/(2*W))**(1/n)
 
 if 'floating' in command_line_arguments:
-  #basal_drag = conditional(floating, 0, basal_drag)
   basal_drag = (1-t_float) * basal_drag
 
 force_balance = (driving_stress + basal_drag + lateral_drag) * phi2
@@ -350,7 +343,21 @@ for i in range(nSteps):
     pyplot.plot(list(x)+[x[-1]],surface_,'b') # plot the glacier top surface
     pyplot.plot(x,bottom_,'b')                # plot the glacier bottom surface
     pyplot.plot(full_x, full_bed, 'g')        # plot the basal topography
-    pyplot.plot((max(L,x0)/1000,500), (0,0), 'c') # plot the water surface
+
+
+    def water_plot(x):
+        if x <= L:
+            return surface(x) >= 0 or h_b(x) >= 0
+        else:
+            return h_b(x) >= 0
+
+    water = map(lambda x: 0, full_x)
+    mask  = map(water_plot, full_mesh.coordinates())
+    water = np.ma.masked_array(water,mask)
+
+    pyplot.plot(full_x, water, 'c') # plot the water surface
+
+    #pyplot.plot((max(L,x0)/1000,500), (0,0), 'c') # plot the water surface
 
     if 'f' in command_line_arguments: # plot the height at which ice should float
       full_float = map(project(-h_b*(rho_w/rho-1), full_V), 1000*full_x)
@@ -372,7 +379,6 @@ for i in range(nSteps):
     plot_details()
 
     pyplot.subplot(313)
-    #ttt.vector()[:] = gaussian_filter(ttt.vector().array(), 2)
     pyplot.plot(x,map(t_float,mesh.coordinates()))
     pyplot.ylim(-.5,1.5)
     plot_details()
