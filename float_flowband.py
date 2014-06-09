@@ -99,7 +99,7 @@ try:
 except:
   dt = Constant(250)
 
-nSteps = 20
+nSteps = 1
 L = 100e3     # Initial length
 
 # Using the notation in the paper (not the book)
@@ -116,7 +116,8 @@ B_s = 540.0   # Flow law constant (B in the book)
 
 # Half width
 W = Expression("25000/(1 + 200*exp(0.05e-3*(x[0]-200e3))) + 5000", cell=interval) 
-bed = "1000/(1 + 200*exp(0.10e-3*(x[0]-250e3))) - 950"
+#bed = "1000/(1 + 200*exp(0.10e-3*(x[0]-250e3))) - 950"
+bed = "100 * sin(x[0]) + 900"
 h_b = Expression(bed, cell=interval)  # Bed elevation
 
 
@@ -149,6 +150,7 @@ def initial_h(h0,hL,xi,L):  # Smoothly join a parabola and a line at xi.
   b = hL-m*L
   return Expression('x[0] < xi ? A*x[0]*x[0]+C : m*x[0]+b',
                      xi=xi, A=A, C=h0, m=m, b=b, cell=interval)
+
 
 h = initial_h(120+0.0003*L, c, 0.4*L, L)
 
@@ -192,6 +194,13 @@ h_old = project(h, V)
 u = project(Expression('x[0]/L', L=1000*L), V) # initial guess of velocity
 h_u_dhdx = project(as_vector((h,u,h.dx(0))), V3)
 h,u,dhdx = split(h_u_dhdx)
+
+class Bhg(Expression):
+    def eval(self, value, x):
+        value[0] = h_b(x) + 100
+
+h = Bhg()
+h.cell = V.cell
 
 class Floating(Expression):
   def eval(self,value,x):
@@ -319,14 +328,14 @@ for i in range(nSteps):
     # Solve #
     #########
 
-    if 'i' not in command_line_arguments:
-      try:
-        solver.solve()
-      except RuntimeError as message:
-        print message
-        end()
-        response = raw_input('Press ENTER to continue ("q" to quit) ')
-        if response == 'q': sys.exit()
+    #if 'i' not in command_line_arguments:
+    #  try:
+    #    solver.solve()
+    #  except RuntimeError as message:
+    #    print message
+    #    end()
+    #    response = raw_input('Press ENTER to continue ("q" to quit) ')
+    #    if response == 'q': sys.exit()
 
     ########
     # Plot #
@@ -346,9 +355,13 @@ for i in range(nSteps):
     surface_ = map(surface, mesh.coordinates())+[bottom(L)]
     bottom_  = map(bottom, mesh.coordinates())
     x = 0.001*mesh.coordinates().flatten()
-    pyplot.plot(list(x)+[x[-1]],surface_,'b') # plot the glacier top surface
-    pyplot.plot(x,bottom_,'b')                # plot the glacier bottom surface
-    pyplot.plot(full_x, full_bed, 'g')        # plot the basal topography
+    # plot the glacier top surface
+    pyplot.plot(list(x)+[x[-1]],surface_,'b',label="top") 
+    # plot the glacier bottom surface
+    pyplot.plot(x,bottom_,'r',label="bottom")
+    # plot the basal topography
+    pyplot.plot(full_x, full_bed,'g',label="bed")
+    pyplot.legend(loc=4,prop={'size':6})
 
     def water_plot(x):
         if x <= L:
