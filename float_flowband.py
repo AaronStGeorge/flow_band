@@ -99,7 +99,7 @@ try:
 except:
   dt = Constant(250)
 
-nSteps = 10
+nSteps = 20
 L = 100e3     # Initial length
 
 # Using the notation in the paper (not the book)
@@ -201,11 +201,17 @@ class Floating(Expression):
       value[0] = 0
 
 t_float = smooth_step_conditional(Floating())
+h_float = Floating()
 
 # A useful expression for the effective pressure term:
-x0 = 250.0e3 + 10.0e3*ln(1.0/3800.0) # x-coordinate where h_b = 0
-reduction = Expression('x[0] <= x0? 0.0 : ratio*('+bed+')', x0=x0, ratio=rho_w/rho)
-#reduction =  t_float * (rho_w/rho)*h_b
+#x0 = 250.0e3 + 10.0e3*ln(1.0/3800.0) # x-coordinate where h_b = 0
+class Reduction(Expression):
+  def eval(self,value,x):
+    if h_b(x) > 0:
+        value[0] = 0
+    else:
+        value[0] = (rho_w/rho) * h_b(x)
+reduction = Reduction()
 
 if 'floating' in command_line_arguments:
   H = t_float * (h/(1-rho/rho_w)) + (1-t_float) * (h-h_b) # H is the ice thickness
@@ -344,7 +350,6 @@ for i in range(nSteps):
     pyplot.plot(x,bottom_,'b')                # plot the glacier bottom surface
     pyplot.plot(full_x, full_bed, 'g')        # plot the basal topography
 
-
     def water_plot(x):
         if x <= L:
             return surface(x) >= 0 or h_b(x) >= 0
@@ -364,7 +369,7 @@ for i in range(nSteps):
       pyplot.plot(full_x, full_float, '--k')
 
     pyplot.ylabel('Height above sea level (m)')
-    pyplot.ylim(-3000,3100)
+    pyplot.ylim(-1000,3100)
     plot_details()
 
     print '\nElevation at the divide is %f, thickness is %f\n' % (surface(0), surface(0)-bottom(0))
@@ -425,7 +430,6 @@ for i in range(nSteps):
     plot_details()
 
     # Plot the residual
-
     if 'r' in command_line_arguments:
       if 'o' in command_line_arguments:
         pyplot.plot(x,map(lambda z: tau_b(z)+tau_lat(z), mesh.coordinates()), '--k')
