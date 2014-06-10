@@ -99,7 +99,7 @@ try:
 except:
   dt = Constant(250)
 
-nSteps = 1
+nSteps = 40
 L = 100e3     # Initial length
 
 # Using the notation in the paper (not the book)
@@ -116,9 +116,19 @@ B_s = 540.0   # Flow law constant (B in the book)
 
 # Half width
 W = Expression("25000/(1 + 200*exp(0.05e-3*(x[0]-200e3))) + 5000", cell=interval) 
-#bed = "1000/(1 + 200*exp(0.10e-3*(x[0]-250e3))) - 950"
-bed = "100 * sin(x[0]) + 900"
+bed = "1000/(1 + 200*exp(0.10e-3*(x[0]-250e3))) - 950"
+bed = "40*sin(x[0]*(2*3.14159265358979323846/100e3)) + 50"
+
+class Bed(Expression):
+    def eval(self,value,x):
+        if x < 300e3:
+            value[0] = 10*sin(-1*x[0]*2*3.14159265358979323846/100e3) + 50
+        else:
+            value[0] = 1000/(1 + 200*exp(0.10e-3*(x[0]-400e3))) - 950
+
 h_b = Expression(bed, cell=interval)  # Bed elevation
+h_b = Bed(cell=interval)
+#h_b = Constant(50)
 
 
 # Parameters specific to the two curves in "Beyond back stress: ..."
@@ -195,13 +205,6 @@ u = project(Expression('x[0]/L', L=1000*L), V) # initial guess of velocity
 h_u_dhdx = project(as_vector((h,u,h.dx(0))), V3)
 h,u,dhdx = split(h_u_dhdx)
 
-class Bhg(Expression):
-    def eval(self, value, x):
-        value[0] = h_b(x) + 100
-
-h = Bhg()
-h.cell = V.cell
-
 class Floating(Expression):
   def eval(self,value,x):
     if h_u_dhdx(x[0])[0] <= -h_b(x[0])*(rho_w/rho-1):
@@ -258,7 +261,7 @@ solver  = NonlinearVariationalSolver(problem)
 
 # To see a list of all parameters: info(solver.parameters, True)
 solver_parameters = solver.parameters['newton_solver']
-solver_parameters['maximum_iterations'] = 20
+solver_parameters['maximum_iterations'] = 100
 solver_parameters['absolute_tolerance'] = 1e-8
 solver_parameters['relative_tolerance'] = 1e-8
 
@@ -312,6 +315,8 @@ def update_mesh(n,L):
 
   if dolfin.__version__[:3] == '1.3':
     mesh.bounding_box_tree().build(mesh)
+  if dolfin.__version__[:3] == '1.4':
+    mesh.bounding_box_tree().build(mesh)
   else:
     mesh.intersection_operator().clear()
   
@@ -328,14 +333,14 @@ for i in range(nSteps):
     # Solve #
     #########
 
-    #if 'i' not in command_line_arguments:
-    #  try:
-    #    solver.solve()
-    #  except RuntimeError as message:
-    #    print message
-    #    end()
-    #    response = raw_input('Press ENTER to continue ("q" to quit) ')
-    #    if response == 'q': sys.exit()
+    if 'i' not in command_line_arguments:
+      try:
+        solver.solve()
+      except RuntimeError as message:
+        print message
+        end()
+        response = raw_input('Press ENTER to continue ("q" to quit) ')
+        if response == 'q': sys.exit()
 
     ########
     # Plot #
@@ -361,7 +366,7 @@ for i in range(nSteps):
     pyplot.plot(x,bottom_,'r',label="bottom")
     # plot the basal topography
     pyplot.plot(full_x, full_bed,'g',label="bed")
-    pyplot.legend(loc=4,prop={'size':6})
+    #pyplot.legend(loc=4,prop={'size':6})
 
     def water_plot(x):
         if x <= L:
@@ -383,6 +388,7 @@ for i in range(nSteps):
 
     pyplot.ylabel('Height above sea level (m)')
     pyplot.ylim(-1000,3100)
+    pyplot.ylim(0,100)
     plot_details()
 
     print '\nElevation at the divide is %f, thickness is %f\n' % (surface(0), surface(0)-bottom(0))
@@ -432,7 +438,6 @@ for i in range(nSteps):
       pyplot.gcf().subplots_adjust(left=0.175, right=0.95)
 
     # Plot terms in the force balance
-
     pyplot.plot(x,map(tau_d,mesh.coordinates()),label=r'$\tau_d$')
     pyplot.plot(x,map(tau_b,mesh.coordinates()),label=r'$\tau_b$')
     pyplot.plot(x,map(tau_lat,mesh.coordinates()),label=r'$\tau_\perp$')
