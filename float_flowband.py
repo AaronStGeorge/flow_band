@@ -45,37 +45,37 @@ command_line_arguments = sys.argv
 
 
 def smooth_step_conditional(c):
- """
- diffuses conditional (or any other function for that matter) to create a 
- smoothed step function.
+  """
+  diffuses conditional (or any other function for that matter) to create a 
+  smoothed step function.
 
- :param c  : Expression conditional to be smoothed
- """
+  :param c  : Expression conditional to be smoothed
+  """
 
- # set boundary condition to conditional
- class Boundary(SubDomain):  # define the Dirichlet boundary
-   def inside(self, x, on_boundary):
-     return on_boundary
-             
- boundary = Boundary()
- bc = DirichletBC(V, c, boundary)
+  # set boundary condition to conditional
+  class Boundary(SubDomain):  # define the Dirichlet boundary
+    def inside(self, x, on_boundary):
+      return on_boundary
+              
+  boundary = Boundary()
+  bc = DirichletBC(V, c, boundary)
 
- # set diffusivity parameter to average cell size
- cs = CellSize(mesh)
- cs = project(cs,V)
- m = cs.vector()*cs.vector()
- D = m.sum()/m.size()
+  # set diffusivity parameter to average cell size
+  cs = CellSize(mesh)
+  cs = project(cs,V)
+  m = cs.vector()*cs.vector()
+  D = m.sum()/m.size()
 
- # solve heat equation with dt=1 (therefore neglected)
- u = TrialFunction(V)
- v = TestFunction(V)
- a = u*v*dx + D*inner(nabla_grad(u), nabla_grad(v))*dx
- L = c*v*dx
+  # solve heat equation with dt=1 (therefore neglected)
+  u = TrialFunction(V)
+  v = TestFunction(V)
+  a = u*v*dx + D*inner(nabla_grad(u), nabla_grad(v))*dx
+  L = c*v*dx
 
- u = Function(V)
- solve(a == L, u, bc)
+  u = Function(V)
+  solve(a == L, u, bc)
 
- return u
+  return u
 
 
 
@@ -97,9 +97,9 @@ try:
   dt = Constant(float(command_line_arguments[-1]))
   raw_input('dt = %f (Press ENTER)' % float(dt))
 except:
-  dt = Constant(250)
+  dt = Constant(150)
 
-nSteps = 40
+nSteps = 50
 L = 100e3     # Initial length
 
 # Using the notation in the paper (not the book)
@@ -122,7 +122,7 @@ bed = "40*sin(x[0]*(2*3.14159265358979323846/100e3)) + 50"
 class Bed(Expression):
     def eval(self,value,x):
         if x < 300e3:
-            value[0] = 10*sin(-1*x[0]*2*3.14159265358979323846/100e3) + 50
+            value[0] = 40*sin(-x[0]*2*3.14159265358979323846/100e3) + 50
         else:
             value[0] = 1000/(1 + 200*exp(0.10e-3*(x[0]-400e3))) - 950
 
@@ -388,7 +388,6 @@ for i in range(nSteps):
 
     pyplot.ylabel('Height above sea level (m)')
     pyplot.ylim(-1000,3100)
-    pyplot.ylim(0,100)
     plot_details()
 
     print '\nElevation at the divide is %f, thickness is %f\n' % (surface(0), surface(0)-bottom(0))
