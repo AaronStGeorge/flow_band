@@ -55,42 +55,25 @@ def plot_details():
   pyplot.xticks(range(0,501,50), labels)
   pyplot.grid(True)
 
-class update_mesh(self):
-  def __init__(self, V):
-    # create correspondence list between V.vector.array and mesh.coordinates
-    mesh_coordinates = interpolate(Expression("x[0]"), V).vector().array()
-    self.indices = []
-    for i in range(N+1):
-      for j in range(N+1):
-        if mesh_coordinates[i] == mesh.coordinates()[j,0]:
-          self.indices.append(j)
-          break
-    del(mesh_coordinates)
+def update_mesh(n, L, mesh, h_u_dhdx, dt, maximum_L):
+  
+  new_L = min(L + float(dt)*h_u_dhdx(L)[1], maximum_L)
+  h_ = np.array(map(h_u_dhdx, mesh.coordinates()))[:,0]
+  new_mesh_coordinates = np.linspace(0, new_L, N+1)
+  h_on_new_mesh = np.empty(N+1)
 
-    if len(self.indices) != N+1:
-      print '\nERROR: Correspondence of self.indices of h.vector.array to\
-              mesh.coordinates failed.'
-      sys.exit()
-
-  def __run__(n, L, mesh, h_u_dhdx, dt, maximum_L):
-    
-    new_L = min(L + float(dt)*h_u_dhdx(L)[1], maximum_L)
-    h_ = np.array(map(h_u_dhdx, mesh.coordinates()))[:,0]
-    new_mesh_coordinates = np.linspace(0, new_L, N+1)
-    h_on_new_mesh = np.empty(N+1)
-
-    for i in range(N+1):
-      if new_mesh_coordinates[i] < L:
-        h_on_new_mesh[self.indices[i]] = h_u_dhdx(new_mesh_coordinates[i])[0]
-      else:
-        h_on_new_mesh[self.indices[i]] = h_[-1]
-
-    h_old.vector()[:] = h_on_new_mesh
-    mesh.coordinates()[:,0] = new_mesh_coordinates
-
-    if (dolfin.__version__[:3] == '1.3') or (dolfin.__version__[:3] == '1.4'):
-      mesh.bounding_box_tree().build(mesh)
+  for i in range(N+1):
+    if new_mesh_coordinates[i] < L:
+      h_on_new_mesh[indices[i]] = h_u_dhdx(new_mesh_coordinates[i])[0]
     else:
-      mesh.intersection_operator().clear()
-    
-    return new_L
+      h_on_new_mesh[indices[i]] = h_[-1]
+
+  h_old.vector()[:] = h_on_new_mesh
+  mesh.coordinates()[:,0] = new_mesh_coordinates
+
+  if (dolfin.__version__[:3] == '1.3') or (dolfin.__version__[:3] == '1.4'):
+    mesh.bounding_box_tree().build(mesh)
+  else:
+    mesh.intersection_operator().clear()
+  
+  return new_L

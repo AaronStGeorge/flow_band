@@ -1,18 +1,18 @@
 from matplotlib import pyplot
-from numpy import ma
-from dolfin import *
 import sys
 
-src_directory = '../flow_line_study_region'
+src_directory = '../data'
 sys.path.append(src_directory)
 
-from tifffile import TiffFile
-from sr_data import mesh, utilities
+from sr_data import SrData
 
+# starting points for flow line ode solver
+y0s = [(437634,-1.29813e6),\
+       (433390,-1.29595e6),\
+       (435283,-1.29619e6),\
+       (433532,-1.29695e6)]
 
-# get data
-data = TiffFile(
-"../flow_line_study_region/study_region/elevation/ASTGTM2_S78E161_dem.tif")
+sr = SrData()
 
 # extents of domain :
 nx    =  1049
@@ -23,22 +23,11 @@ east  =  west  + nx*dx
 south =  -1304473.006
 north =  south + ny*dx
 
-vara['b'] = {'map_data'          : data.asarray(),
-             'map_western_edge'  : west,
-             'map_eastern_edge'  : east,  
-             'map_southern_edge' : south,
-             'map_northern_edge' : north,
-             'projection'        : proj,
-             'standard lat'      : lat_0,
-             'standard lon'      : lon_0,
-             'lat true scale'    : lat_ts}
-
-# create expression for bed
-sr   = utilities.DataInput(None,vara[b],mesh=mesh)
-bed
-
 #plot
-pyplot.imshow(vara['b']['map_data'], extent=[west,east,south,north])
-plot(project(bed,FunctionSpace(mesh, 'Lagrange', 1)))
+fig = pyplot.gcf()
+pyplot.imshow(sr.data['b'], 
+              extent=[sr.x_min,sr.x_max,sr.y_min,sr.y_max], 
+              origin='lower')
+for y0 in y0s:
+  fig.gca().add_artist(pyplot.Circle(y0,100,color='k'))
 pyplot.show()
-Interactive()
