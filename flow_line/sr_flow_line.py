@@ -32,85 +32,94 @@ def rhs_func(t,y):
     else:
       return array([0.0,0.0])
 
-def spline_expression_sr_bed(y0, kx=3):
-  """
-  Creates a spline-interpolation expression for flow line  created from the
-  inverse gradient of bed slope for the antarctic dry valleys study region.
-  Optional arguments <kx> determine order of approximation (default cubic).
-  """
-  # Initial arclength
-  t0 = 0.0
+class FlowLineSr:
 
-  # Intialize ode solver
-  from scipy.integrate import ode
-  r = ode(rhs_func).set_integrator('vode',method='adams')
-  r.set_initial_value(y0,t0)
-  dt = 100.
-  # Edge to ege the dry valleys study region is about 3,000,000 meters
-  t_end = 3000000. 
-  
-  # x,y positions
-  pos_x = [y0[0]]
-  pos_y = [y0[1]]
-  
-  # arclength
-  rs = [0.0]
-  
-  # Query data structures
-  Blist = [sr.B(y0[0],y0[1])]
-  
-  # Integrate through "time" (really arclength)
-  while r.successful() and r.t<t_end and any(rhs_func(0.0,r.y)):
-    r.integrate(r.t + dt)
-    pos_x.append(r.y[0])
-    pos_y.append(r.y[1])
-    rs.append(r.t)
-  
-    # Query dolfin functions and add to list
-    Blist.append(sr.B(r.y[0],r.y[1]))
-  
-  # Convert lists into arrays 
-  s = array(rs)
-  B = array(Blist)
+  def __init__(self, y0, kx=3):
+    """
+    Creates a spline-interpolation expression for flow line  created from the
+    inverse gradient of bed slope for the antarctic dry valleys study region.
+    Optional arguments <kx> determine order of approximation (default cubic).
+    """
 
-  # Create spline
-  spline = interp1d(s, B, kind=kx)
-  
-  # Expression object for use with FEniCS
-  class SrFlowBand(Expression):
-    def __init__(self, pos_x, pos_y, y0, s, B):
-      self.pos_x = pos_x
-      self.pos_y = pos_y
-      self.y0    = y0
-      self.s     = s
-      self.B     = B
-  
-    def eval(self, values, x):
-      values[0] = spline(x[0])
+    self.y0 = y0
 
-    def plot_fl(self):
-      fig = pyplot.figure(figsize=(14,7))
+    # Initial arclength
+    t0 = 0.0
 
-      # Subplot 1
-      ax1 = fig.add_subplot(121)
-      ax1.set_title("Dry valleys elevation")
-      ax1.imshow(sr.data['b'], 
-                    extent=[sr.x_min, sr.x_max, sr.y_min, sr.y_max], 
-                    origin='lower')
-      fig.gca().add_artist(pyplot.Circle(self.y0, 100, color='r'))
-      ax1.set_xlim(sr.x_min, sr.x_max)
-      ax1.set_ylim(sr.y_min, sr.y_max)
-      ax1.plot(self.pos_x, self.pos_y, color='r')
-      
-      # Subplot 2
-      ax2 = fig.add_subplot(122)
-      ax2.set_title("Bed elevation")
-      ax2.set_xlabel("length (m)")
-      ax2.set_ylabel("height (m)")
-      ax2.yaxis.tick_right()
-      ax2.yaxis.set_label_position('right')
-      ax2.plot(s,B)
+    # Intialize ode solver
+    from scipy.integrate import ode
+    r = ode(rhs_func).set_integrator('vode',method='adams')
+    r.set_initial_value(y0,t0)
+    dt = 100.
+    # Edge to ege the dry valleys study region is about 3,000,000 meters
+    t_end = 3000000. 
+    
+    # x,y positions
+    self.pos_x = [y0[0]]
+    self.pos_y = [y0[1]]
+    
+    # arclength
+    rs = [0.0]
+    
+    # Query data structures
+    Blist = [sr.B(y0[0],y0[1])]
+    
+    # Integrate through "time" (really arclength)
+    while r.successful() and r.t<t_end and any(rhs_func(0.0,r.y)):
+      r.integrate(r.t + dt)
+      self.pos_x.append(r.y[0])
+      self.pos_y.append(r.y[1])
+      rs.append(r.t)
+    
+      # Query dolfin functions and add to list
+      Blist.append(sr.B(r.y[0],r.y[1]))
+    
+    # Convert lists into arrays 
+    self.s = array(rs)
+    self.B = array(Blist)
 
-      pyplot.show()
-  
-  return SrFlowBand(pos_x, pos_y, y0, s, B)
+    # make extents available in namespace
+    self.minimum = 0
+    self.maximum = max(self.s)
+
+    # Create spline
+    self.spline = interp1d(self.s, self.B, kind=kx)
+
+  def plot_fl(self):
+
+    fig = pyplot.figure(figsize=(14,7))
+
+    # Subplot 1
+    ax1 = fig.add_subplot(121)
+    ax1.set_title("Dry valleys elevation")
+    ax1.imshow(sr.data['b'], 
+                  extent=[sr.x_min, sr.x_max, sr.y_min, sr.y_max], 
+                  origin='lower')
+    fig.gca().add_artist(pyplot.Circle(self.y0, 100, color='r'))
+    ax1.set_xlim(sr.x_min, sr.x_max)
+    ax1.set_ylim(sr.y_min, sr.y_max)
+    ax1.plot(self.pos_x, self.pos_y, color='r')
+    
+    # Subplot 2
+    ax2 = fig.add_subplot(122)
+    ax2.set_title("Bed elevation")
+    ax2.set_xlabel("length (m)")
+    ax2.set_ylabel("height (m)")
+    ax2.yaxis.tick_right()
+    ax2.yaxis.set_label_position('right')
+    ax2.plot(self.s,self.B)
+
+    pyplot.show()
+
+  def spline_expression_sr_bed(self,element):
+    
+    # Expression object for use with FEniCS
+    class SrFlowBand(Expression):
+    
+      def eval(s, values, x):
+        values[0] = self.spline(x[0])
+
+      def value_shape(self):
+        return (1,)
+    
+    return SrFlowBand(element=element)
