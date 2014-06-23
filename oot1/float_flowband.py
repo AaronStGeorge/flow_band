@@ -14,8 +14,8 @@ from demo import *
 command_line_arguments = sys.argv
 
 curve = 1 
-dt = Constant(150)
-nSteps = 50
+dt = Constant(.5)
+nSteps = 500
 
 # Using the notation in the paper (not the book)
 n     = 3.0   # Flow law exponent
@@ -43,11 +43,15 @@ class Bed(Expression):
 
 #h_b = Expression(bed, cell=interval)  # Bed elevation
 #h_b = Bed(cell=interval)
-flow_line = FlowLineSr(y0s[4])
+flow_line = FlowLineSr(y0s[2])
+
+
+
+
 
 # Parameters specific to the two curves in "Beyond back stress: ..."
 if curve == 1:
-  M = Constant(0.3)    # Accumulation
+  #M = Constant(0.3)    # Accumulation
   if 'shelf' in command_line_arguments:
     maximum_L = 498.00e3 # Final length
     c =  78.46           # Surface elevation at the calving front
@@ -97,19 +101,23 @@ order = 1  # Linear finite elements
 V     = FunctionSpace(mesh, 'Lagrange', order)
 V3    = VectorFunctionSpace(mesh, 'Lagrange', order, 3)
 
+M = Expression("-(.3/L)*x[0] + .3",L=L)    # Accumulation
+
 h_b = flow_line.spline_expression_sr_bed(V.ufl_element())
 
 #####################
 # Initial Condition #
 #####################
 
-h = initial_h(h_b(L)+200, h_b(L)+100, 0.4*L, L)
+ice_cliff = 20
+
+h = initial_h(h_b(0)+2*ice_cliff, h_b(L)+ice_cliff, 0.4*L, L)
 
 helper_functions = HelperFunctions(mesh, V, h_b, W, maximum_L)
 
 class BC(Expression):
   def eval(self,value,x):
-    value[0] = h_b(L) + 100
+    value[0] = h_b(L) + ice_cliff
 
 boundary_conditions = [
   DirichletBC(V3.sub(0), BC(), boundary, TERMINUS), # h(L) = c
@@ -154,13 +162,14 @@ phi1, phi2, phi3 = split(testFunction)
 mass_conservation = ((h-h_old)/dt + (H*u*W).dx(0)/W - M)*phi1
 
 driving_stress = rho*g*H*dhdx
-basal_drag     = mu*A_s*(H+reduction)**p*u**(1/n)
-lateral_drag   = (B_s*H/W)*((n+2)*u/(2*W))**(1/n)
+#basal_drag     = mu*A_s*(H+reduction)**p*u**(1/n)
+basal_drag     = Constant(5)
+lateral_drag   = (B_s*H/W)*((n+2)*(u+.0001)/(2*W))**(1/n)
 
 if 'floating' in command_line_arguments:
   basal_drag = (1-t_float) * basal_drag
 
-force_balance = (driving_stress + basal_drag + lateral_drag) * phi2
+force_balance = (driving_stress + basal_drag ) * phi2 #+ lateral_drag
 
 F = (mass_conservation + force_balance)*dx
 
@@ -185,8 +194,7 @@ solver_parameters['relative_tolerance'] = 1e-8
 # Time Loop #
 #############
 
-#for i in range(nSteps):
-for i in range(10):
+for i in range(nSteps): 
   try:
 
     #########

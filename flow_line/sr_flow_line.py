@@ -117,7 +117,7 @@ class FlowLineSr:
     class SrFlowBand(Expression):
     
       def eval(s, values, x):
-        values[0] = self.spline(x[0])
+        values[0] = self.spline(x[0]) / 5.
 
       def value_shape(self):
         return (1,)

@@ -3,7 +3,6 @@ from matplotlib import pyplot
 from numpy import array, linspace, empty
 import numpy as np
 
-import numpy as np
 def initial_h(h0,hL,xi,L):  # Smoothly join a parabola and a line at xi.
   if xi <= 0:
     return Expression('m*x[0]+b', m=(hL-h0)/L, b=h0, cell=interval)
@@ -153,7 +152,7 @@ class HelperFunctions:
     #  pyplot.plot(self.full_x, full_float, '--k')
 
     pyplot.ylabel('Height above sea level (m)')
-    pyplot.ylim(-400,2500)
+    pyplot.ylim(100,500)
     plot_details()
 
     print '\nElevation at the divide is %f, thickness is %f\n' % (surface(0), surface(0)-bottom(0))
@@ -164,7 +163,7 @@ class HelperFunctions:
     pyplot.plot(self.full_x, -self.full_w, 'g')
     pyplot.xlabel('Distance from ice divide (km)')
     pyplot.ylabel('Velocity (m/a)')
-    pyplot.ylim(-50,300)
+    #pyplot.ylim(-50,300)
     plot_details()
 
 
