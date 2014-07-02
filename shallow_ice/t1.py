@@ -5,9 +5,13 @@ from matplotlib import pyplot as plt
 
 #==== Parameters ===============================================================
 
+# B - bed height - (meters)
+# h - surface elevation - (meters)
+# H - ice thickness - (meters)
+
 L   = 100      # initial length - (meters)
-h0  = 10      # h(0) initial height at 0 - (meters)
-hL  = 0        # h(L) initial height at L - (meters)
+h0  = 10       # h(0) initial height at x=0 - (meters)
+hL  = 0        # h(L) initial height at x=L - (meters)
 nfe = 100      # number of finite elements - (int) 
 
 #==== Helper functions =========================================================
@@ -22,7 +26,6 @@ def initial_h(h0,hL,xi,L):
   return Expression('x[0] < xi ? A*x[0]*x[0]+C : m*x[0]+b',
                      xi=xi, A=A, C=h0, m=m, b=b, cell=interval)
 
-# Plot glacier profile at current t
 class Ploting:
 
   def __init__(self, L):
@@ -31,6 +34,9 @@ class Ploting:
     self.full_x    = self.full_mesh.coordinates()
 
   def plot_profile(self, L, B, h, mesh, V):
+    """
+    Plot glacier profile at current t
+    """
     x   = mesh.coordinates()
     bed = map(project(B, self.full_V), self.full_x)
     ice = map(project(h, V), x)
@@ -54,4 +60,8 @@ B = Constant(5)
 # Initial profile
 h = initial_h(B(0)+h0 ,B(L)+hL, .25*L, L)
 
-ploting.plot_profile(L, B, h, mesh, V)
+u = Constant(10)
+
+for i in range(10):
+  mesh.move(u)
+  ploting.plot_profile(L, B, h, mesh, V)
